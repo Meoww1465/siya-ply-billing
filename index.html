@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Siya Ply World - Billing & Ledger</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- HTML2PDF CDN for Automatic PDF Generation -->
+  <!-- HTML2PDF CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     @media print {
@@ -54,13 +54,28 @@
         <button onclick="cancelInvoiceEdit()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded-lg font-medium transition">Exit Edit</button>
       </div>
 
+      <!-- Customer Details with Dropdown/Auto-Suggest -->
       <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
-          <label class="text-xs font-semibold text-slate-600">Customer Name *</label>
-          <input id="billCustName" oninput="saveCurrentDraft()" type="text" placeholder="e.g. Ramesh Carpenter" class="w-full mt-1 px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-neutral-900 font-semibold" />
+          <div class="flex justify-between items-center">
+            <label class="text-xs font-semibold text-slate-600">Customer Name *</label>
+            <span class="text-[10px] text-amber-700 font-medium">▼ Dropdown available</span>
+          </div>
+          <!-- Dropdown Datalist -->
+          <input 
+            id="billCustName" 
+            list="customerDatalist" 
+            oninput="handleCustomerSelect()" 
+            type="text" 
+            placeholder="Select or Type Customer..." 
+            class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-neutral-900 font-semibold bg-amber-50/30" 
+          />
+          <datalist id="customerDatalist">
+            <!-- Dynamically populated -->
+          </datalist>
         </div>
         <div>
-          <label class="text-xs font-semibold text-slate-600">Mobile No. (WhatsApp)</label>
+          <label class="text-xs font-semibold text-slate-600">Mobile No. (Auto-fills on select)</label>
           <input id="billCustPhone" oninput="saveCurrentDraft()" type="tel" placeholder="10-digit number" class="w-full mt-1 px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-neutral-900" />
         </div>
         <div>
@@ -315,13 +330,13 @@
     </div>
   </main>
 
-  <!-- TAB 3: BILL HISTORY (WITH EDIT, REPRINT & DELETE) -->
+  <!-- TAB 3: BILL HISTORY -->
   <main id="historyView" class="max-w-6xl mx-auto p-3 sm:p-6 w-full hidden no-print">
     <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-4">
       <div class="flex justify-between items-center border-b pb-3">
         <div>
           <h3 class="font-bold text-sm text-slate-800 uppercase">Saved Bills History</h3>
-          <p class="text-xs text-slate-500">Aap kisi bhi bill ko Reprint, Edit (Rate/Items Theek) ya Delete kar sakte hain</p>
+          <p class="text-xs text-slate-500">Reprint, Edit ya Delete karein</p>
         </div>
         <button onclick="loadBillHistory()" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded font-medium">🔄 Refresh</button>
       </div>
@@ -384,8 +399,9 @@
 
   <script>
     let db;
-    let currentlyEditingInvoiceId = null; // Track if we are editing an existing invoice
-    let editingItemIndex = null; // Track if editing a specific line item
+    let allCachedCustomers = [];
+    let currentlyEditingInvoiceId = null;
+    let editingItemIndex = null;
 
     const req = indexedDB.open("SiyaPlyWorldDB_V2", 1);
     req.onupgradeneeded = function(e) {
@@ -464,6 +480,38 @@
         document.getElementById('printLogo').src = data;
         document.getElementById('printLogo').classList.remove('hidden');
       }
+    }
+
+    // Refresh Customer Dropdowns across both Counter Billing and Ledger
+    function refreshCustomerDropdown() {
+      const tx = db.transaction("customers", "readonly");
+      tx.objectStore("customers").getAll().onsuccess = function(e) {
+        allCachedCustomers = e.target.result || [];
+
+        // 1. Fill Counter Billing Datalist
+        const datalist = document.getElementById('customerDatalist');
+        datalist.innerHTML = allCachedCustomers.map(c => `
+          <option value="${c.name}">${c.phone ? '📞 ' + c.phone : ''}</option>
+        `).join('');
+
+        // 2. Fill Ledger Select Box
+        const ledgerSelect = document.getElementById('selectedLedgerCustomer');
+        ledgerSelect.innerHTML = allCachedCustomers.map(c => `
+          <option value="${c.id}">${c.name} (${c.phone || 'No Phone'})</option>
+        `).join('');
+
+        loadCustomerLedger();
+      };
+    }
+
+    // When customer is selected in Counter Bill
+    function handleCustomerSelect() {
+      const inputVal = document.getElementById('billCustName').value.trim();
+      const matched = allCachedCustomers.find(c => c.name.toLowerCase() === inputVal.toLowerCase());
+      if (matched && matched.phone) {
+        document.getElementById('billCustPhone').value = matched.phone;
+      }
+      saveCurrentDraft();
     }
 
     function toggleCalcFields(prefix) {
@@ -614,7 +662,7 @@
     }
 
     function saveCurrentDraft() {
-      if (currentlyEditingInvoiceId) return; // Don't overwrite draft if editing saved bill
+      if (currentlyEditingInvoiceId) return;
       const draft = {
         name: document.getElementById('billCustName').value,
         phone: document.getElementById('billCustPhone').value,
@@ -658,12 +706,11 @@
     }
 
     function cancelInvoiceEdit() {
-      if (confirm('Editing band karke blank bill par jana hai?')) {
+      if (confirm('Editing cancel karke blank bill par jana hai?')) {
         resetBillCounter(false);
       }
     }
 
-    // Save or Update Bill Record
     function saveInvoiceRecord(callback) {
       if (currentBillItems.length === 0) return alert('Bill me items add karein!');
       const custName = document.getElementById('billCustName').value.trim();
@@ -718,26 +765,34 @@
 
       if (currentlyEditingInvoiceId) {
         invoiceData.id = currentlyEditingInvoiceId;
-        invStore.put(invoiceData); // Update existing
+        invStore.put(invoiceData);
       } else {
-        invStore.add(invoiceData); // Create new
+        invStore.add(invoiceData);
       }
 
-      // Auto-Khata update for remaining balance
-      if (balanceAmt > 0) {
-        const custStore = tx.objectStore("customers");
-        const ledgerStore = tx.objectStore("ledger");
+      // Ensure customer exists in customer store for future dropdowns
+      const custStore = tx.objectStore("customers");
+      custStore.getAll().onsuccess = function(e) {
+        let customers = e.target.result;
+        let foundCust = customers.find(c => c.name.toLowerCase() === custName.toLowerCase());
 
-        custStore.getAll().onsuccess = function(e) {
-          let customers = e.target.result;
-          let foundCust = customers.find(c => c.name.toLowerCase() === custName.toLowerCase());
+        if (!foundCust) {
+          custStore.add({ name: custName, phone: custPhone });
+        } else if (custPhone && !foundCust.phone) {
+          foundCust.phone = custPhone;
+          custStore.put(foundCust);
+        }
 
+        // Auto-Khata update if there is balance due
+        if (balanceAmt > 0) {
+          const ledgerStore = tx.objectStore("ledger");
           const itemsSummary = currentBillItems.map(i => `${i.name} (${i.detail})`).join(', ');
           const entryDesc = `Bill #${invNo}: ${itemsSummary} (Total: ₹${numGrandTotal}, Jama: ₹${paidAmt})`;
 
-          const doAddLedger = (cId) => {
+          const targetCustId = foundCust ? foundCust.id : null;
+          if (targetCustId) {
             ledgerStore.add({
-              customerId: cId,
+              customerId: targetCustId,
               date: billDate,
               type: 'goods',
               description: entryDesc,
@@ -745,24 +800,15 @@
               credit: 0,
               returnAmt: 0
             });
-          };
-
-          if (foundCust) {
-            doAddLedger(foundCust.id);
-          } else {
-            const addCustReq = custStore.add({ name: custName, phone: custPhone });
-            addCustReq.onsuccess = function(ev) {
-              doAddLedger(ev.target.result);
-              refreshCustomerDropdown();
-            };
           }
-        };
-      }
+        }
+      };
 
       tx.oncomplete = function() {
         if (!currentlyEditingInvoiceId) {
           localStorage.setItem('spw_inv_num', counter + 1);
         }
+        refreshCustomerDropdown();
         setNewInvoiceNumber();
         populatePrintTemplate(invoiceData);
         if (callback) callback(invoiceData);
@@ -863,15 +909,6 @@
       const tx = db.transaction("customers", "readwrite");
       tx.objectStore("customers").add({ name, phone });
       tx.oncomplete = () => refreshCustomerDropdown();
-    }
-
-    function refreshCustomerDropdown() {
-      const tx = db.transaction("customers", "readonly");
-      tx.objectStore("customers").getAll().onsuccess = function(e) {
-        const select = document.getElementById('selectedLedgerCustomer');
-        select.innerHTML = e.target.result.map(c => `<option value="${c.id}">${c.name} (${c.phone || 'No Phone'})</option>`).join('');
-        loadCustomerLedger();
-      };
     }
 
     function toggleLedgerEntryKind() {
@@ -1116,7 +1153,7 @@
       });
     }
 
-    // TAB 3: BILL HISTORY (WITH EDIT, REPRINT & DELETE)
+    // TAB 3: BILL HISTORY
     function loadBillHistory() {
       const tx = db.transaction("invoices", "readonly");
       tx.objectStore("invoices").getAll().onsuccess = function(e) {
@@ -1154,14 +1191,12 @@
       };
     }
 
-    // LOAD SAVED BILL BACK INTO BILLING FORM FOR EDITING
     function editSavedBill(id) {
       const tx = db.transaction("invoices", "readonly");
       tx.objectStore("invoices").get(id).onsuccess = function(e) {
         const inv = e.target.result;
         currentlyEditingInvoiceId = inv.id;
 
-        // Fill Form
         document.getElementById('displayInvNo').innerText = `Bill #${inv.invNo}`;
         document.getElementById('billCustName').value = inv.custName;
         document.getElementById('billCustPhone').value = inv.phone || '';
@@ -1177,7 +1212,6 @@
         currentBillItems = [...inv.items];
         renderBillTable();
 
-        // Switch to Billing Tab & Show Banner
         switchTab('billing');
         document.getElementById('editingBanner').classList.remove('hidden');
         document.getElementById('editingBillInfo').innerText = `${inv.invNo} (${inv.custName}) - Update karke save karein`;
@@ -1191,9 +1225,7 @@
       if (confirm('Kya aap sach me ye bill permanently delete karna chahte hain?')) {
         const tx = db.transaction("invoices", "readwrite");
         tx.objectStore("invoices").delete(id);
-        tx.oncomplete = function() {
-          loadBillHistory();
-        };
+        tx.oncomplete = () => loadBillHistory();
       }
     }
 
