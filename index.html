@@ -44,13 +44,23 @@
   <!-- TAB 1: COUNTER BILLING -->
   <main id="billingView" class="max-w-6xl mx-auto p-3 sm:p-6 w-full grid grid-cols-1 lg:grid-cols-3 gap-6 no-print">
     <section class="lg:col-span-2 space-y-4">
+      
+      <!-- Edit Mode Banner -->
+      <div id="editingBanner" class="p-3 bg-blue-50 border border-blue-200 rounded-xl flex justify-between items-center hidden">
+        <div>
+          <span class="text-xs font-bold text-blue-900 uppercase">Mode: Editing Bill</span>
+          <p id="editingBillInfo" class="text-xs text-blue-700 font-mono"></p>
+        </div>
+        <button onclick="cancelInvoiceEdit()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded-lg font-medium transition">Exit Edit</button>
+      </div>
+
       <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <label class="text-xs font-semibold text-slate-600">Customer Name *</label>
           <input id="billCustName" oninput="saveCurrentDraft()" type="text" placeholder="e.g. Ramesh Carpenter" class="w-full mt-1 px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-neutral-900 font-semibold" />
         </div>
         <div>
-          <label class="text-xs font-semibold text-slate-600">Mobile No. (for WhatsApp PDF)</label>
+          <label class="text-xs font-semibold text-slate-600">Mobile No. (WhatsApp)</label>
           <input id="billCustPhone" oninput="saveCurrentDraft()" type="tel" placeholder="10-digit number" class="w-full mt-1 px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-neutral-900" />
         </div>
         <div>
@@ -59,10 +69,10 @@
         </div>
       </div>
 
-      <!-- Add Item Form -->
+      <!-- Add / Edit Item Form -->
       <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
         <div class="flex justify-between items-center">
-          <h2 class="text-sm font-bold text-slate-700 uppercase tracking-wider">Item Details</h2>
+          <h2 id="itemFormHeader" class="text-sm font-bold text-slate-700 uppercase tracking-wider">Item Details</h2>
           <select id="billItemType" onchange="toggleCalcFields('bill')" class="text-xs border rounded p-1 bg-white font-medium">
             <option value="plywood">Plywood / Laminate (Sq.Ft Formula)</option>
             <option value="general">Hardware / Adhesive (Direct Qty)</option>
@@ -108,8 +118,8 @@
         </div>
 
         <div class="flex justify-between items-center pt-2">
-          <span class="text-xs text-emerald-600 font-semibold">● Ready</span>
-          <button onclick="addBillItem()" class="bg-neutral-900 hover:bg-black text-white px-5 py-2 rounded-lg text-xs font-medium transition">+ Add Item to Bill</button>
+          <button id="cancelItemEditBtn" onclick="cancelItemEdit()" class="text-xs text-slate-500 hover:text-slate-800 underline hidden">Cancel Item Edit</button>
+          <button onclick="addBillItem()" id="addItemBtn" class="bg-neutral-900 hover:bg-black text-white px-5 py-2 rounded-lg text-xs font-medium transition ml-auto">+ Add Item to Bill</button>
         </div>
       </div>
 
@@ -124,7 +134,7 @@
               <th class="p-3 text-right">Total Sq.Ft</th>
               <th class="p-3 text-right">Rate</th>
               <th class="p-3 text-right">Total (₹)</th>
-              <th class="p-3 text-center">Action</th>
+              <th class="p-3 text-center">Actions</th>
             </tr>
           </thead>
           <tbody id="billItemsBody" class="divide-y divide-slate-100 font-mono">
@@ -161,7 +171,7 @@
         </div>
       </div>
 
-      <!-- Part Payment Module -->
+      <!-- Payment Option -->
       <div class="space-y-2 pt-2 border-t text-xs">
         <div>
           <label class="font-semibold text-slate-700">Payment Mode / Terms</label>
@@ -181,25 +191,24 @@
             <label class="font-semibold text-red-600">Baaki Udhaar (Balance ₹):</label>
             <span id="billPartDue" class="font-mono font-black text-red-600">₹0.00</span>
           </div>
-          <p class="text-[10px] text-slate-500">Baaki bacha hua amount customer ke khate me udhaar chadh jayega.</p>
         </div>
       </div>
 
       <div class="space-y-2 pt-3">
-        <button onclick="saveAndPrintBill(false)" class="w-full bg-neutral-900 hover:bg-black text-white py-2.5 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2">
+        <button onclick="saveAndPrintBill(false)" id="saveBillBtn" class="w-full bg-neutral-900 hover:bg-black text-white py-2.5 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2">
           🖨️ Save & Print Bill
         </button>
         <button onclick="downloadPdfAndOpenWhatsApp()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2 shadow-sm">
           📥 Download PDF & WhatsApp
         </button>
         <button onclick="resetBillCounter(true)" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-1.5 rounded-lg text-xs font-medium transition">
-          + Clear / New Bill
+          + Clear / Blank Bill
         </button>
       </div>
     </section>
   </main>
 
-  <!-- TAB 2: KHATA / LEDGER (PART PAYMENT & WAPIS) -->
+  <!-- TAB 2: KHATA / LEDGER -->
   <main id="ledgerView" class="max-w-6xl mx-auto p-3 sm:p-6 w-full space-y-6 hidden no-print">
     <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
       <div>
@@ -306,13 +315,13 @@
     </div>
   </main>
 
-  <!-- TAB 3: BILL HISTORY -->
+  <!-- TAB 3: BILL HISTORY (WITH EDIT, REPRINT & DELETE) -->
   <main id="historyView" class="max-w-6xl mx-auto p-3 sm:p-6 w-full hidden no-print">
     <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-4">
       <div class="flex justify-between items-center border-b pb-3">
         <div>
           <h3 class="font-bold text-sm text-slate-800 uppercase">Saved Bills History</h3>
-          <p class="text-xs text-slate-500">Reprint, Download PDF, ya Delete karein</p>
+          <p class="text-xs text-slate-500">Aap kisi bhi bill ko Reprint, Edit (Rate/Items Theek) ya Delete kar sakte hain</p>
         </div>
         <button onclick="loadBillHistory()" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded font-medium">🔄 Refresh</button>
       </div>
@@ -375,6 +384,9 @@
 
   <script>
     let db;
+    let currentlyEditingInvoiceId = null; // Track if we are editing an existing invoice
+    let editingItemIndex = null; // Track if editing a specific line item
+
     const req = indexedDB.open("SiyaPlyWorldDB_V2", 1);
     req.onupgradeneeded = function(e) {
       db = e.target.result;
@@ -465,7 +477,6 @@
       }
     }
 
-    // Part Payment Toggle & Logic
     function togglePartPaymentFields() {
       const status = document.getElementById('billPayStatus').value;
       const box = document.getElementById('partPaymentBox');
@@ -492,28 +503,71 @@
       if (!name) return alert('Item ka naam enter karein');
 
       let amount = 0, sqft = 0, detail = '', rate = 0;
+      let length = 0, width = 0, qty = 0;
 
       if (type === 'plywood') {
-        const l = parseFloat(document.getElementById('billLen').value) || 0;
-        const w = parseFloat(document.getElementById('billWid').value) || 0;
-        const q = parseFloat(document.getElementById('billQty').value) || 0;
+        length = parseFloat(document.getElementById('billLen').value) || 0;
+        width = parseFloat(document.getElementById('billWid').value) || 0;
+        qty = parseFloat(document.getElementById('billQty').value) || 0;
         rate = parseFloat(document.getElementById('billRate').value) || 0;
         if (rate <= 0) return alert('Rate per sqft enter karein!');
-        sqft = l * w * q;
+        sqft = length * width * qty;
         amount = sqft * rate;
-        detail = `${l}×${w} ft (${q} sh)`;
+        detail = `${length}×${width} ft (${qty} sh)`;
       } else {
-        const q = parseFloat(document.getElementById('billGenQty').value) || 0;
+        qty = parseFloat(document.getElementById('billGenQty').value) || 0;
         rate = parseFloat(document.getElementById('billGenRate').value) || 0;
         if (rate <= 0) return alert('Rate enter karein!');
-        amount = q * rate;
-        detail = `${q} units`;
+        amount = qty * rate;
+        detail = `${qty} units`;
       }
 
-      currentBillItems.push({ name, detail, sqft, rate, amount });
+      const itemObj = { name, type, length, width, qty, detail, sqft, rate, amount };
+
+      if (editingItemIndex !== null) {
+        currentBillItems[editingItemIndex] = itemObj;
+        editingItemIndex = null;
+        document.getElementById('itemFormHeader').innerText = "Item Details";
+        document.getElementById('addItemBtn').innerText = "+ Add Item to Bill";
+        document.getElementById('cancelItemEditBtn').classList.add('hidden');
+      } else {
+        currentBillItems.push(itemObj);
+      }
+
       renderBillTable();
       saveCurrentDraft();
       document.getElementById('billItemName').value = '';
+    }
+
+    function editItemRow(idx) {
+      const item = currentBillItems[idx];
+      editingItemIndex = idx;
+
+      document.getElementById('billItemName').value = item.name;
+      document.getElementById('billItemType').value = item.type || 'plywood';
+      toggleCalcFields('bill');
+
+      if (item.type === 'general') {
+        document.getElementById('billGenQty').value = item.qty;
+        document.getElementById('billGenRate').value = item.rate;
+      } else {
+        document.getElementById('billLen').value = item.length || 8;
+        document.getElementById('billWid').value = item.width || 4;
+        document.getElementById('billQty').value = item.qty || 1;
+        document.getElementById('billRate').value = item.rate;
+      }
+
+      document.getElementById('itemFormHeader').innerText = "Edit Item Details";
+      document.getElementById('addItemBtn').innerText = "Update Item";
+      document.getElementById('cancelItemEditBtn').classList.remove('hidden');
+    }
+
+    function cancelItemEdit() {
+      editingItemIndex = null;
+      document.getElementById('billItemName').value = '';
+      document.getElementById('itemFormHeader').innerText = "Item Details";
+      document.getElementById('addItemBtn').innerText = "+ Add Item to Bill";
+      document.getElementById('cancelItemEditBtn').classList.add('hidden');
     }
 
     function renderBillTable() {
@@ -529,7 +583,10 @@
             <td class="p-3 text-right">${item.sqft ? item.sqft.toFixed(2) + ' sqft' : '-'}</td>
             <td class="p-3 text-right">₹${item.rate}</td>
             <td class="p-3 text-right font-bold">₹${item.amount.toFixed(2)}</td>
-            <td class="p-3 text-center"><button onclick="removeItem(${idx})" class="text-red-500 font-bold px-2 py-1 font-sans">Delete</button></td>
+            <td class="p-3 text-center space-x-2 font-sans">
+              <button onclick="editItemRow(${idx})" class="text-blue-600 hover:underline font-medium">Edit</button>
+              <button onclick="removeItem(${idx})" class="text-red-500 hover:underline font-medium">Delete</button>
+            </td>
           </tr>
         `).join('');
       }
@@ -557,6 +614,7 @@
     }
 
     function saveCurrentDraft() {
+      if (currentlyEditingInvoiceId) return; // Don't overwrite draft if editing saved bill
       const draft = {
         name: document.getElementById('billCustName').value,
         phone: document.getElementById('billCustPhone').value,
@@ -570,7 +628,7 @@
 
     function loadSavedDraft() {
       const raw = localStorage.getItem('spw_active_draft');
-      if (raw) {
+      if (raw && !currentlyEditingInvoiceId) {
         const draft = JSON.parse(raw);
         document.getElementById('billCustName').value = draft.name || '';
         document.getElementById('billCustPhone').value = draft.phone || '';
@@ -585,6 +643,9 @@
     function resetBillCounter(ask) {
       if (ask && !confirm('Blank naya bill shuru karein?')) return;
       currentBillItems = [];
+      currentlyEditingInvoiceId = null;
+      document.getElementById('editingBanner').classList.add('hidden');
+      document.getElementById('saveBillBtn').innerText = "🖨️ Save & Print Bill";
       document.getElementById('billCustName').value = '';
       document.getElementById('billCustPhone').value = '';
       document.getElementById('billDiscount').value = '0';
@@ -592,23 +653,31 @@
       document.getElementById('billPayStatus').value = 'Paid';
       togglePartPaymentFields();
       localStorage.removeItem('spw_active_draft');
+      setNewInvoiceNumber();
       renderBillTable();
     }
 
-    // Save Bill + Auto Khata (Handles Full Udhaar & Part-Payment)
-    function saveInvoiceRecord(callback) {
-      if (currentBillItems.length === 0) {
-        alert('Bill me items add karein!');
-        return;
+    function cancelInvoiceEdit() {
+      if (confirm('Editing band karke blank bill par jana hai?')) {
+        resetBillCounter(false);
       }
+    }
+
+    // Save or Update Bill Record
+    function saveInvoiceRecord(callback) {
+      if (currentBillItems.length === 0) return alert('Bill me items add karein!');
       const custName = document.getElementById('billCustName').value.trim();
-      if (!custName) {
-        alert('Customer Name enter karein!');
-        return;
+      if (!custName) return alert('Customer Name enter karein!');
+
+      let invNo;
+      let counter = parseInt(localStorage.getItem('spw_inv_num') || 1001);
+
+      if (currentlyEditingInvoiceId) {
+        invNo = document.getElementById('displayInvNo').innerText.replace('Bill #', '');
+      } else {
+        invNo = `SPW-${counter}`;
       }
 
-      let counter = parseInt(localStorage.getItem('spw_inv_num') || 1001);
-      const invNo = `SPW-${counter}`;
       const grandTotal = document.getElementById('billGrandTotal').innerText;
       const billDate = document.getElementById('billDate').value;
       const payStatus = document.getElementById('billPayStatus').value;
@@ -645,9 +714,16 @@
       };
 
       const tx = db.transaction(["invoices", "customers", "ledger"], "readwrite");
-      tx.objectStore("invoices").add(invoiceData);
+      const invStore = tx.objectStore("invoices");
 
-      // Auto Khata Update if there is balance due
+      if (currentlyEditingInvoiceId) {
+        invoiceData.id = currentlyEditingInvoiceId;
+        invStore.put(invoiceData); // Update existing
+      } else {
+        invStore.add(invoiceData); // Create new
+      }
+
+      // Auto-Khata update for remaining balance
       if (balanceAmt > 0) {
         const custStore = tx.objectStore("customers");
         const ledgerStore = tx.objectStore("ledger");
@@ -665,7 +741,7 @@
               date: billDate,
               type: 'goods',
               description: entryDesc,
-              debit: balanceAmt, // Only unpaid balance enters ledger
+              debit: balanceAmt,
               credit: 0,
               returnAmt: 0
             });
@@ -684,7 +760,9 @@
       }
 
       tx.oncomplete = function() {
-        localStorage.setItem('spw_inv_num', counter + 1);
+        if (!currentlyEditingInvoiceId) {
+          localStorage.setItem('spw_inv_num', counter + 1);
+        }
         setNewInvoiceNumber();
         populatePrintTemplate(invoiceData);
         if (callback) callback(invoiceData);
@@ -745,7 +823,6 @@
       });
     }
 
-    // AUTOMATIC PDF DOWNLOAD & WHATSAPP CHAT OPEN
     function downloadPdfAndOpenWhatsApp() {
       saveInvoiceRecord((inv) => {
         const printElement = document.getElementById('printArea');
@@ -762,7 +839,6 @@
         html2pdf().set(opt).from(printElement).save().then(() => {
           printElement.classList.add('hidden');
 
-          // Open WhatsApp Chat with Pre-filled text
           const phone = inv.phone;
           const msg = `*SIYA PLY WORLD - INVOICE: ${inv.invNo}*%0A` +
             `Namaste ${inv.custName} ji,%0A` +
@@ -1040,7 +1116,7 @@
       });
     }
 
-    // TAB 3: BILL HISTORY
+    // TAB 3: BILL HISTORY (WITH EDIT, REPRINT & DELETE)
     function loadBillHistory() {
       const tx = db.transaction("invoices", "readonly");
       tx.objectStore("invoices").getAll().onsuccess = function(e) {
@@ -1068,12 +1144,46 @@
                 ${inv.payStatus === 'Partial' ? `PART (Baaki ₹${inv.balanceAmt})` : inv.payStatus}
               </span>
             </td>
-            <td class="p-3 text-center space-x-2 font-sans">
-              <button onclick="reprintSavedBill(${inv.id})" class="bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs px-2 py-1 rounded font-medium border">Reprint</button>
-              <button onclick="deleteSavedBill(${inv.id})" class="bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded font-bold shadow-sm">Delete</button>
+            <td class="p-3 text-center space-x-2 font-sans whitespace-nowrap">
+              <button onclick="reprintSavedBill(${inv.id})" class="bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs px-2.5 py-1 rounded font-medium border">Reprint</button>
+              <button onclick="editSavedBill(${inv.id})" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2.5 py-1 rounded font-bold shadow-sm">Edit</button>
+              <button onclick="deleteSavedBill(${inv.id})" class="bg-red-600 hover:bg-red-700 text-white text-xs px-2.5 py-1 rounded font-bold shadow-sm">Delete</button>
             </td>
           </tr>
         `).join('');
+      };
+    }
+
+    // LOAD SAVED BILL BACK INTO BILLING FORM FOR EDITING
+    function editSavedBill(id) {
+      const tx = db.transaction("invoices", "readonly");
+      tx.objectStore("invoices").get(id).onsuccess = function(e) {
+        const inv = e.target.result;
+        currentlyEditingInvoiceId = inv.id;
+
+        // Fill Form
+        document.getElementById('displayInvNo').innerText = `Bill #${inv.invNo}`;
+        document.getElementById('billCustName').value = inv.custName;
+        document.getElementById('billCustPhone').value = inv.phone || '';
+        document.getElementById('billDate').value = inv.date;
+        document.getElementById('billDiscount').value = inv.discount || 0;
+        document.getElementById('billPayStatus').value = inv.payStatus || 'Paid';
+        togglePartPaymentFields();
+
+        if (inv.payStatus === 'Partial') {
+          document.getElementById('billPartPaid').value = inv.paidAmt || 0;
+        }
+
+        currentBillItems = [...inv.items];
+        renderBillTable();
+
+        // Switch to Billing Tab & Show Banner
+        switchTab('billing');
+        document.getElementById('editingBanner').classList.remove('hidden');
+        document.getElementById('editingBillInfo').innerText = `${inv.invNo} (${inv.custName}) - Update karke save karein`;
+        document.getElementById('saveBillBtn').innerText = "💾 Update Bill & Print";
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       };
     }
 
@@ -1081,7 +1191,9 @@
       if (confirm('Kya aap sach me ye bill permanently delete karna chahte hain?')) {
         const tx = db.transaction("invoices", "readwrite");
         tx.objectStore("invoices").delete(id);
-        tx.oncomplete = () => loadBillHistory();
+        tx.oncomplete = function() {
+          loadBillHistory();
+        };
       }
     }
 
