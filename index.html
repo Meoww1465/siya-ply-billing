@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Siya Ply World - Billing & Ledger</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- HTML2PDF CDN for Automatic PDF Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     @media print {
       body * { visibility: hidden; }
@@ -48,7 +50,7 @@
           <input id="billCustName" oninput="saveCurrentDraft()" type="text" placeholder="e.g. Ramesh Carpenter" class="w-full mt-1 px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-neutral-900 font-semibold" />
         </div>
         <div>
-          <label class="text-xs font-semibold text-slate-600">Mobile No. (WhatsApp)</label>
+          <label class="text-xs font-semibold text-slate-600">Mobile No. (for WhatsApp PDF)</label>
           <input id="billCustPhone" oninput="saveCurrentDraft()" type="tel" placeholder="10-digit number" class="w-full mt-1 px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-neutral-900" />
         </div>
         <div>
@@ -57,7 +59,7 @@
         </div>
       </div>
 
-      <!-- Add Item Form with Dimension Labels -->
+      <!-- Add Item Form -->
       <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
         <div class="flex justify-between items-center">
           <h2 class="text-sm font-bold text-slate-700 uppercase tracking-wider">Item Details</h2>
@@ -132,7 +134,7 @@
       </div>
     </section>
 
-    <!-- Bill Totals & Actions -->
+    <!-- Bill Totals & Part-Payment Option -->
     <section class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4 h-fit">
       <div class="flex justify-between items-center border-b pb-2">
         <h3 class="font-bold text-sm">Invoice Summary</h3>
@@ -159,24 +161,36 @@
         </div>
       </div>
 
-      <!-- Payment / Udhaar Option -->
+      <!-- Part Payment Module -->
       <div class="space-y-2 pt-2 border-t text-xs">
         <div>
-          <label class="font-semibold text-slate-700">Payment Option</label>
-          <select id="billPayStatus" class="w-full mt-1 border-2 border-amber-300 rounded-lg p-2 bg-amber-50 font-bold text-neutral-900">
-            <option value="Credit">🔴 Udhaar (Auto Khata Entry)</option>
+          <label class="font-semibold text-slate-700">Payment Mode / Terms</label>
+          <select id="billPayStatus" onchange="togglePartPaymentFields()" class="w-full mt-1 border-2 border-amber-300 rounded-lg p-2 bg-amber-50 font-bold text-neutral-900">
             <option value="Paid">🟢 Full Cash / UPI Paid</option>
+            <option value="Partial">🟡 Part Payment (Kuch Jama + Kuch Udhaar)</option>
+            <option value="Credit">🔴 Full Udhaar (Khata Me Add Karein)</option>
           </select>
-          <p class="text-[11px] text-slate-500 mt-1">Agar <strong>Udhaar</strong> select kiya, to customer ke khate me ye bill khud-ba-khud jud jayega.</p>
+        </div>
+
+        <div id="partPaymentBox" class="p-3 bg-neutral-50 rounded-lg border border-neutral-200 space-y-2 hidden">
+          <div class="flex justify-between items-center">
+            <label class="font-semibold text-emerald-700">Jama Amount (Paid ₹):</label>
+            <input id="billPartPaid" type="number" oninput="calculatePartBalance()" placeholder="0" class="w-28 p-1.5 border rounded text-right font-bold text-emerald-700 bg-white" />
+          </div>
+          <div class="flex justify-between items-center border-t pt-1">
+            <label class="font-semibold text-red-600">Baaki Udhaar (Balance ₹):</label>
+            <span id="billPartDue" class="font-mono font-black text-red-600">₹0.00</span>
+          </div>
+          <p class="text-[10px] text-slate-500">Baaki bacha hua amount customer ke khate me udhaar chadh jayega.</p>
         </div>
       </div>
 
       <div class="space-y-2 pt-3">
-        <button onclick="saveAndPrintBill()" class="w-full bg-neutral-900 hover:bg-black text-white py-2.5 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2">
+        <button onclick="saveAndPrintBill(false)" class="w-full bg-neutral-900 hover:bg-black text-white py-2.5 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2">
           🖨️ Save & Print Bill
         </button>
-        <button onclick="shareBillWhatsApp()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-2">
-          💬 Send on WhatsApp
+        <button onclick="downloadPdfAndOpenWhatsApp()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2 shadow-sm">
+          📥 Download PDF & WhatsApp
         </button>
         <button onclick="resetBillCounter(true)" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-1.5 rounded-lg text-xs font-medium transition">
           + Clear / New Bill
@@ -185,14 +199,12 @@
     </section>
   </main>
 
-  <!-- TAB 2: KHATA / LEDGER -->
+  <!-- TAB 2: KHATA / LEDGER (PART PAYMENT & WAPIS) -->
   <main id="ledgerView" class="max-w-6xl mx-auto p-3 sm:p-6 w-full space-y-6 hidden no-print">
     <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
       <div>
         <label class="text-xs font-semibold text-slate-600">Select Customer / Contractor</label>
-        <select id="selectedLedgerCustomer" onchange="loadCustomerLedger()" class="w-full mt-1 p-2 border rounded-lg text-sm bg-white font-medium">
-          <!-- Dynamically filled -->
-        </select>
+        <select id="selectedLedgerCustomer" onchange="loadCustomerLedger()" class="w-full mt-1 p-2 border rounded-lg text-sm bg-white font-medium"></select>
       </div>
       <div>
         <button onclick="promptNewCustomer()" class="mt-5 bg-neutral-800 hover:bg-neutral-900 text-white px-3 py-2 rounded-lg text-xs font-medium">+ Add New Customer</button>
@@ -203,10 +215,10 @@
       </div>
     </div>
 
-    <!-- Manual Entry Form (Maal / Wapis / Jama) -->
+    <!-- Multi-Date Entry Form -->
     <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-3">
       <div class="flex justify-between items-center border-b pb-2">
-        <h3 id="formModeHeader" class="text-sm font-bold text-slate-800 uppercase tracking-wide">Add Entry (Delivery / Return / Payment)</h3>
+        <h3 id="formModeHeader" class="text-sm font-bold text-slate-800 uppercase tracking-wide">Add Entry (Delivery / Return / Part-Payment)</h3>
         <span class="text-xs text-slate-400">Date-wise hisaab</span>
       </div>
 
@@ -221,13 +233,13 @@
           <label class="text-xs font-semibold text-slate-700">Transaction Type</label>
           <select id="ledgerEntryType" onchange="toggleLedgerEntryKind()" class="w-full mt-1 p-2 border rounded-lg text-xs bg-white font-bold">
             <option value="goods" class="text-slate-800">1. Maal Delivery (Goods Given)</option>
-            <option value="return" class="text-amber-700">2. Maal Wapis (Sales Return)</option>
-            <option value="payment" class="text-emerald-700">3. Payment Received (Jama)</option>
+            <option value="payment" class="text-emerald-700">2. Kisht / Part Payment Jama</option>
+            <option value="return" class="text-amber-700">3. Maal Wapis (Sales Return)</option>
           </select>
         </div>
         <div class="sm:col-span-2">
-          <label class="text-xs font-semibold text-slate-600">Item Name / Note</label>
-          <input id="ledgerDesc" type="text" placeholder="e.g. 2 sheets 18mm returned / Cash Jama" class="w-full mt-1 p-2 border rounded-lg text-xs" />
+          <label class="text-xs font-semibold text-slate-600">Item Name / Payment Mode Note</label>
+          <input id="ledgerDesc" type="text" placeholder="e.g. Part Cash Jama / PhonePe / 2 sheets 18mm" class="w-full mt-1 p-2 border rounded-lg text-xs" />
         </div>
       </div>
 
@@ -271,7 +283,7 @@
         <h4 class="font-bold text-xs text-slate-700 uppercase tracking-wide">Customer Account Statement</h4>
         <div class="space-x-2">
           <button onclick="printCustomerLedger()" class="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-1 rounded text-xs font-medium transition">🖨️ Print Statement</button>
-          <button onclick="shareLedgerWhatsApp()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-xs font-medium transition">💬 WhatsApp Statement</button>
+          <button onclick="downloadLedgerPdfAndWhatsApp()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-xs font-medium transition">📥 PDF & WhatsApp</button>
         </div>
       </div>
       <div class="overflow-x-auto">
@@ -283,7 +295,7 @@
               <th class="p-3">Description / Details</th>
               <th class="p-3 text-right">Maal Gaya (+)</th>
               <th class="p-3 text-right">Maal Wapis (-)</th>
-              <th class="p-3 text-right">Jama / Cash (-)</th>
+              <th class="p-3 text-right">Kisht / Jama (-)</th>
               <th class="p-3 text-right">Remaining Balance</th>
               <th class="p-3 text-center">Actions</th>
             </tr>
@@ -294,13 +306,13 @@
     </div>
   </main>
 
-  <!-- TAB 3: BILL HISTORY (WITH PROMINENT RED DELETE BUTTON) -->
+  <!-- TAB 3: BILL HISTORY -->
   <main id="historyView" class="max-w-6xl mx-auto p-3 sm:p-6 w-full hidden no-print">
     <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-4">
       <div class="flex justify-between items-center border-b pb-3">
         <div>
           <h3 class="font-bold text-sm text-slate-800 uppercase">Saved Bills History</h3>
-          <p class="text-xs text-slate-500">Aap kisi bhi bill ko reprint kar sakte hain ya red button se delete kar sakte hain</p>
+          <p class="text-xs text-slate-500">Reprint, Download PDF, ya Delete karein</p>
         </div>
         <button onclick="loadBillHistory()" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded font-medium">🔄 Refresh</button>
       </div>
@@ -311,7 +323,7 @@
               <th class="p-3">Bill No</th>
               <th class="p-3">Date</th>
               <th class="p-3">Customer Name</th>
-              <th class="p-3">Total Items</th>
+              <th class="p-3">Items</th>
               <th class="p-3 text-right">Amount (₹)</th>
               <th class="p-3">Payment</th>
               <th class="p-3 text-center">Actions</th>
@@ -323,8 +335,8 @@
     </div>
   </main>
 
-  <!-- PRINTABLE TEMPLATE -->
-  <div id="printArea" class="hidden max-w-3xl mx-auto bg-white">
+  <!-- PRINT & PDF EXPORT TEMPLATE -->
+  <div id="printArea" class="hidden max-w-3xl mx-auto bg-white p-4">
     <div class="border-b-2 border-neutral-900 pb-3 flex items-center justify-between">
       <div class="flex items-center space-x-3">
         <img id="printLogo" src="" class="h-20 w-20 object-contain hidden" alt="SPW Logo" />
@@ -362,7 +374,6 @@
   </div>
 
   <script>
-    // IndexedDB Setup
     let db;
     const req = indexedDB.open("SiyaPlyWorldDB_V2", 1);
     req.onupgradeneeded = function(e) {
@@ -454,6 +465,25 @@
       }
     }
 
+    // Part Payment Toggle & Logic
+    function togglePartPaymentFields() {
+      const status = document.getElementById('billPayStatus').value;
+      const box = document.getElementById('partPaymentBox');
+      if (status === 'Partial') {
+        box.classList.remove('hidden');
+        calculatePartBalance();
+      } else {
+        box.classList.add('hidden');
+      }
+    }
+
+    function calculatePartBalance() {
+      const grandTotal = parseFloat(document.getElementById('billGrandTotal').innerText.replace('₹', '')) || 0;
+      const paid = parseFloat(document.getElementById('billPartPaid').value) || 0;
+      const due = Math.max(0, grandTotal - paid);
+      document.getElementById('billPartDue').innerText = `₹${due.toFixed(2)}`;
+    }
+
     let currentBillItems = [];
 
     function addBillItem() {
@@ -461,15 +491,13 @@
       const type = document.getElementById('billItemType').value;
       if (!name) return alert('Item ka naam enter karein');
 
-      let amount = 0, sqft = 0, detail = '';
-      let rate = 0;
+      let amount = 0, sqft = 0, detail = '', rate = 0;
 
       if (type === 'plywood') {
         const l = parseFloat(document.getElementById('billLen').value) || 0;
         const w = parseFloat(document.getElementById('billWid').value) || 0;
         const q = parseFloat(document.getElementById('billQty').value) || 0;
         rate = parseFloat(document.getElementById('billRate').value) || 0;
-
         if (rate <= 0) return alert('Rate per sqft enter karein!');
         sqft = l * w * q;
         amount = sqft * rate;
@@ -485,7 +513,6 @@
       currentBillItems.push({ name, detail, sqft, rate, amount });
       renderBillTable();
       saveCurrentDraft();
-
       document.getElementById('billItemName').value = '';
     }
 
@@ -519,13 +546,14 @@
       const subtotal = currentBillItems.reduce((acc, i) => acc + i.amount, 0);
       const gstRate = parseFloat(document.getElementById('billGstRate').value) || 0;
       const discount = parseFloat(document.getElementById('billDiscount').value) || 0;
-
       const gst = (subtotal * gstRate) / 100;
       const grand = Math.max(0, subtotal + gst - discount);
 
       document.getElementById('billSubtotal').innerText = `₹${subtotal.toFixed(2)}`;
       document.getElementById('billGstAmt').innerText = `₹${gst.toFixed(2)}`;
       document.getElementById('billGrandTotal').innerText = `₹${Math.round(grand).toFixed(2)}`;
+
+      calculatePartBalance();
     }
 
     function saveCurrentDraft() {
@@ -560,15 +588,24 @@
       document.getElementById('billCustName').value = '';
       document.getElementById('billCustPhone').value = '';
       document.getElementById('billDiscount').value = '0';
+      document.getElementById('billPartPaid').value = '';
+      document.getElementById('billPayStatus').value = 'Paid';
+      togglePartPaymentFields();
       localStorage.removeItem('spw_active_draft');
       renderBillTable();
     }
 
-    // AUTOMATIC BILL SAVE & AUTOMATIC KHATA (UDHAAR) SYNC
-    function saveAndPrintBill() {
-      if (currentBillItems.length === 0) return alert('Bill me items add karein!');
+    // Save Bill + Auto Khata (Handles Full Udhaar & Part-Payment)
+    function saveInvoiceRecord(callback) {
+      if (currentBillItems.length === 0) {
+        alert('Bill me items add karein!');
+        return;
+      }
       const custName = document.getElementById('billCustName').value.trim();
-      if (!custName) return alert('Kripya Customer Name zaroor enter karein!');
+      if (!custName) {
+        alert('Customer Name enter karein!');
+        return;
+      }
 
       let counter = parseInt(localStorage.getItem('spw_inv_num') || 1001);
       const invNo = `SPW-${counter}`;
@@ -577,6 +614,20 @@
       const payStatus = document.getElementById('billPayStatus').value;
       const custPhone = document.getElementById('billCustPhone').value.trim();
       const numGrandTotal = parseFloat(grandTotal.replace('₹', '')) || 0;
+
+      let paidAmt = 0;
+      let balanceAmt = 0;
+
+      if (payStatus === 'Paid') {
+        paidAmt = numGrandTotal;
+        balanceAmt = 0;
+      } else if (payStatus === 'Credit') {
+        paidAmt = 0;
+        balanceAmt = numGrandTotal;
+      } else if (payStatus === 'Partial') {
+        paidAmt = parseFloat(document.getElementById('billPartPaid').value) || 0;
+        balanceAmt = Math.max(0, numGrandTotal - paidAmt);
+      }
 
       const invoiceData = {
         invNo: invNo,
@@ -588,15 +639,16 @@
         gst: document.getElementById('billGstAmt').innerText,
         discount: document.getElementById('billDiscount').value,
         grandTotal: grandTotal,
-        payStatus: payStatus
+        payStatus: payStatus,
+        paidAmt: paidAmt,
+        balanceAmt: balanceAmt
       };
 
-      // 1. Save in Invoices Store
       const tx = db.transaction(["invoices", "customers", "ledger"], "readwrite");
       tx.objectStore("invoices").add(invoiceData);
 
-      // 2. If Udhaar, AUTO ADD TO CUSTOMER KHATA
-      if (payStatus === 'Credit') {
+      // Auto Khata Update if there is balance due
+      if (balanceAmt > 0) {
         const custStore = tx.objectStore("customers");
         const ledgerStore = tx.objectStore("ledger");
 
@@ -605,32 +657,26 @@
           let foundCust = customers.find(c => c.name.toLowerCase() === custName.toLowerCase());
 
           const itemsSummary = currentBillItems.map(i => `${i.name} (${i.detail})`).join(', ');
-          const entryDesc = `Bill #${invNo}: ${itemsSummary}`;
+          const entryDesc = `Bill #${invNo}: ${itemsSummary} (Total: ₹${numGrandTotal}, Jama: ₹${paidAmt})`;
 
-          if (foundCust) {
+          const doAddLedger = (cId) => {
             ledgerStore.add({
-              customerId: foundCust.id,
+              customerId: cId,
               date: billDate,
               type: 'goods',
               description: entryDesc,
-              debit: numGrandTotal,
+              debit: balanceAmt, // Only unpaid balance enters ledger
               credit: 0,
               returnAmt: 0
             });
+          };
+
+          if (foundCust) {
+            doAddLedger(foundCust.id);
           } else {
-            // Customer pehle nahi tha, to auto-create karo
             const addCustReq = custStore.add({ name: custName, phone: custPhone });
             addCustReq.onsuccess = function(ev) {
-              const newCustId = ev.target.result;
-              ledgerStore.add({
-                customerId: newCustId,
-                date: billDate,
-                type: 'goods',
-                description: entryDesc,
-                debit: numGrandTotal,
-                credit: 0,
-                returnAmt: 0
-              });
+              doAddLedger(ev.target.result);
               refreshCustomerDropdown();
             };
           }
@@ -640,71 +686,100 @@
       tx.oncomplete = function() {
         localStorage.setItem('spw_inv_num', counter + 1);
         setNewInvoiceNumber();
-
-        // Trigger Print Layout
-        document.getElementById('printDocType').innerText = "TAX INVOICE";
-        document.getElementById('pRefNo').innerText = invoiceData.invNo;
-        document.getElementById('pName').innerText = invoiceData.custName;
-        document.getElementById('pPhone').innerText = invoiceData.phone || 'N/A';
-        document.getElementById('pDate').innerText = invoiceData.date;
-
-        document.getElementById('pTableHead').innerHTML = `
-          <tr>
-            <th class="py-2">Item Description</th>
-            <th class="py-2">Size / Detail</th>
-            <th class="py-2 text-right">Sq.Ft / Qty</th>
-            <th class="py-2 text-right">Rate</th>
-            <th class="py-2 text-right">Amount</th>
-          </tr>
-        `;
-
-        document.getElementById('pTableBody').innerHTML = invoiceData.items.map(i => `
-          <tr>
-            <td class="py-2 font-sans font-medium">${i.name}</td>
-            <td class="py-2 text-slate-600 font-sans">${i.detail}</td>
-            <td class="py-2 text-right font-mono">${i.sqft ? i.sqft.toFixed(2) : '-'}</td>
-            <td class="py-2 text-right font-mono">₹${i.rate}</td>
-            <td class="py-2 text-right font-bold font-mono">₹${i.amount.toFixed(2)}</td>
-          </tr>
-        `).join('');
-
-        document.getElementById('pTotalsBlock').innerHTML = `
-          <p>Subtotal: ${invoiceData.subtotal}</p>
-          <p>GST: ${invoiceData.gst}</p>
-          <p>Discount: ₹${invoiceData.discount}</p>
-          <p class="text-sm font-black border-t pt-1">Grand Total: ${invoiceData.grandTotal}</p>
-          <p class="text-[10px] text-slate-500 uppercase">Status: ${invoiceData.payStatus === 'Credit' ? 'UDHAAR (KHATA AUTO-UPDATED)' : 'PAID'}</p>
-        `;
-
-        document.getElementById('printArea').classList.remove('hidden');
-        window.print();
-        document.getElementById('printArea').classList.add('hidden');
-
-        resetBillCounter(false);
+        populatePrintTemplate(invoiceData);
+        if (callback) callback(invoiceData);
       };
     }
 
-    function shareBillWhatsApp() {
-      if (currentBillItems.length === 0) return alert('Bill me koi item nahi hai');
-      const phone = document.getElementById('billCustPhone').value.trim();
-      const name = document.getElementById('billCustName').value.trim() || "Customer";
-      const total = document.getElementById('billGrandTotal').innerText;
+    function populatePrintTemplate(inv) {
+      document.getElementById('printDocType').innerText = "TAX INVOICE";
+      document.getElementById('pRefNo').innerText = inv.invNo;
+      document.getElementById('pName').innerText = inv.custName;
+      document.getElementById('pPhone').innerText = inv.phone || 'N/A';
+      document.getElementById('pDate').innerText = inv.date;
 
-      let itemLines = currentBillItems.map((i, idx) => `${idx + 1}. ${i.name} (${i.detail}) - ₹${i.amount.toFixed(0)}`).join('%0A');
+      document.getElementById('pTableHead').innerHTML = `
+        <tr>
+          <th class="py-2">Item Description</th>
+          <th class="py-2">Size / Detail</th>
+          <th class="py-2 text-right">Sq.Ft / Qty</th>
+          <th class="py-2 text-right">Rate</th>
+          <th class="py-2 text-right">Amount</th>
+        </tr>
+      `;
 
-      const msg = `*SIYA PLY WORLD - INVOICE*%0A` +
-        `Customer: ${name}%0A` +
-        `Date: ${document.getElementById('billDate').value}%0A` +
-        `---------------------------%0A` +
-        itemLines + `%0A` +
-        `---------------------------%0A` +
-        `*Grand Total: ${total}*%0A` +
-        `Shukriya!`;
+      document.getElementById('pTableBody').innerHTML = inv.items.map(i => `
+        <tr>
+          <td class="py-2 font-sans font-medium">${i.name}</td>
+          <td class="py-2 text-slate-600 font-sans">${i.detail}</td>
+          <td class="py-2 text-right font-mono">${i.sqft ? i.sqft.toFixed(2) : '-'}</td>
+          <td class="py-2 text-right font-mono">₹${i.rate}</td>
+          <td class="py-2 text-right font-bold font-mono">₹${i.amount.toFixed(2)}</td>
+        </tr>
+      `).join('');
 
-      window.open(`https://wa.me/${phone ? '91' + phone : ''}?text=${msg}`, '_blank');
+      let paymentDetails = `<p class="text-sm font-black border-t pt-1">Grand Total: ${inv.grandTotal}</p>`;
+      if (inv.payStatus === 'Partial') {
+        paymentDetails += `
+          <p class="text-emerald-700">Jama (Received): ₹${inv.paidAmt.toFixed(2)}</p>
+          <p class="text-red-600 font-black">Baaki Udhaar (Due): ₹${inv.balanceAmt.toFixed(2)}</p>
+        `;
+      } else {
+        paymentDetails += `<p class="text-[10px] text-slate-500 uppercase">Payment: ${inv.payStatus}</p>`;
+      }
+
+      document.getElementById('pTotalsBlock').innerHTML = `
+        <p>Subtotal: ${inv.subtotal}</p>
+        <p>GST: ${inv.gst}</p>
+        <p>Discount: ₹${inv.discount}</p>
+        ${paymentDetails}
+      `;
     }
 
-    // TAB 2: KHATA ENGINE
+    function saveAndPrintBill() {
+      saveInvoiceRecord(() => {
+        document.getElementById('printArea').classList.remove('hidden');
+        window.print();
+        document.getElementById('printArea').classList.add('hidden');
+        resetBillCounter(false);
+      });
+    }
+
+    // AUTOMATIC PDF DOWNLOAD & WHATSAPP CHAT OPEN
+    function downloadPdfAndOpenWhatsApp() {
+      saveInvoiceRecord((inv) => {
+        const printElement = document.getElementById('printArea');
+        printElement.classList.remove('hidden');
+
+        const opt = {
+          margin: 10,
+          filename: `${inv.invNo}_${inv.custName.replace(/\s+/g, '_')}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        html2pdf().set(opt).from(printElement).save().then(() => {
+          printElement.classList.add('hidden');
+
+          // Open WhatsApp Chat with Pre-filled text
+          const phone = inv.phone;
+          const msg = `*SIYA PLY WORLD - INVOICE: ${inv.invNo}*%0A` +
+            `Namaste ${inv.custName} ji,%0A` +
+            `Aapka bill generate ho gaya hai.%0A` +
+            `*Grand Total: ${inv.grandTotal}*%0A` +
+            (inv.balanceAmt > 0 ? `*Baaki Udhaar (Due): ₹${inv.balanceAmt.toFixed(2)}*%0A` : `Status: Fully Paid%0A`) +
+            `Humne PDF invoice download kar diya hai, kripya check karein. Shukriya!`;
+
+          const waUrl = phone ? `https://wa.me/91${phone}?text=${msg}` : `https://wa.me/?text=${msg}`;
+          window.open(waUrl, '_blank');
+
+          resetBillCounter(false);
+        });
+      });
+    }
+
+    // TAB 2: KHATA
     function promptNewCustomer() {
       const name = prompt("Customer / Contractor Name:");
       if (!name) return;
@@ -766,7 +841,7 @@
         details = `WAPIS: ${desc} [${l}×${w}ft, ${q} sheets @ ₹${r}]`;
       } else {
         credit = parseFloat(document.getElementById('ledTotalAmt').value) || parseFloat(prompt("Received Payment Amount (₹):") || 0);
-        details = desc || "Payment Received";
+        details = desc || "Part-Payment Received";
       }
 
       if (debit === 0 && credit === 0 && returnAmt === 0) return alert('Valid amount enter karein');
@@ -821,7 +896,7 @@
           let badge = '';
           if (item.type === 'goods') badge = '<span class="bg-red-50 text-red-700 font-sans px-2 py-0.5 rounded text-[10px]">Maal Delivery</span>';
           else if (item.type === 'return') badge = '<span class="bg-amber-100 text-amber-900 font-sans px-2 py-0.5 rounded text-[10px] font-bold">Maal Wapis</span>';
-          else badge = '<span class="bg-emerald-50 text-emerald-700 font-sans px-2 py-0.5 rounded text-[10px]">Payment</span>';
+          else badge = '<span class="bg-emerald-50 text-emerald-700 font-sans px-2 py-0.5 rounded text-[10px] font-bold">Part-Payment (Jama)</span>';
 
           return `
             <tr class="hover:bg-slate-50 transition">
@@ -874,13 +949,13 @@
       document.getElementById('editEntryId').value = '';
       document.getElementById('ledgerDesc').value = '';
       document.getElementById('ledTotalAmt').value = '';
-      document.getElementById('formModeHeader').innerText = "Add Entry (Delivery / Return / Payment)";
+      document.getElementById('formModeHeader').innerText = "Add Entry (Delivery / Return / Part-Payment)";
       document.getElementById('saveEntryBtn').innerText = "💾 Save Entry to Khata";
       document.getElementById('cancelEditBtn').classList.add('hidden');
       toggleLedgerEntryKind();
     }
 
-    function printCustomerLedger() {
+    function populateLedgerPrintTemplate(callback) {
       const custSelect = document.getElementById('selectedLedgerCustomer');
       const custName = custSelect.options[custSelect.selectedIndex].text;
       const custId = parseInt(custSelect.value);
@@ -924,29 +999,48 @@
           <p class="text-sm">Total Outstanding Balance: <span class="text-red-600 font-mono font-black">₹${bal.toFixed(2)}</span></p>
         `;
 
-        document.getElementById('printArea').classList.remove('hidden');
-        window.print();
-        document.getElementById('printArea').classList.add('hidden');
+        callback(custName, bal);
       };
     }
 
-    function shareLedgerWhatsApp() {
-      const custSelect = document.getElementById('selectedLedgerCustomer');
-      const custName = custSelect.options[custSelect.selectedIndex].text;
-      const bal = document.getElementById('ledgerTotalBalance').innerText;
-
-      const msg = `*SIYA PLY WORLD - KHATA STATEMENT*%0A` +
-        `Customer: ${custName}%0A` +
-        `Date: ${new Date().toLocaleDateString('en-IN')}%0A` +
-        `--------------------------------%0A` +
-        `*Total Baaki Balance: ${bal}*%0A` +
-        `--------------------------------%0A` +
-        `Kripya baaki payment clear karein. Shukriya!`;
-
-      window.open(`https://wa.me/?text=${msg}`, '_blank');
+    function printCustomerLedger() {
+      populateLedgerPrintTemplate(() => {
+        document.getElementById('printArea').classList.remove('hidden');
+        window.print();
+        document.getElementById('printArea').classList.add('hidden');
+      });
     }
 
-    // TAB 3: BILL HISTORY & DELETE BUTTON
+    function downloadLedgerPdfAndWhatsApp() {
+      populateLedgerPrintTemplate((custName, bal) => {
+        const printElement = document.getElementById('printArea');
+        printElement.classList.remove('hidden');
+
+        const opt = {
+          margin: 10,
+          filename: `Khata_${custName.replace(/\s+/g, '_')}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        html2pdf().set(opt).from(printElement).save().then(() => {
+          printElement.classList.add('hidden');
+
+          const msg = `*SIYA PLY WORLD - ACCOUNT STATEMENT*%0A` +
+            `Customer: ${custName}%0A` +
+            `Date: ${new Date().toLocaleDateString('en-IN')}%0A` +
+            `--------------------------------%0A` +
+            `*Total Baaki Balance: ₹${bal.toFixed(2)}*%0A` +
+            `--------------------------------%0A` +
+            `Aapka statement download ho gaya hai. Kripya check karein. Shukriya!`;
+
+          window.open(`https://wa.me/?text=${msg}`, '_blank');
+        });
+      });
+    }
+
+    // TAB 3: BILL HISTORY
     function loadBillHistory() {
       const tx = db.transaction("invoices", "readonly");
       tx.objectStore("invoices").getAll().onsuccess = function(e) {
@@ -965,24 +1059,29 @@
             <td class="p-3 font-sans font-medium text-slate-800">${inv.custName}</td>
             <td class="p-3 font-sans">${inv.items.length} items</td>
             <td class="p-3 text-right font-bold text-neutral-900">${inv.grandTotal}</td>
-            <td class="p-3"><span class="text-[10px] px-2 py-0.5 rounded font-bold ${inv.payStatus === 'Credit' ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-green-100 text-green-700'}">${inv.payStatus === 'Credit' ? 'UDHAAR' : 'PAID'}</span></td>
+            <td class="p-3">
+              <span class="text-[10px] px-2 py-0.5 rounded font-bold ${
+                inv.payStatus === 'Credit' ? 'bg-amber-100 text-amber-900 border border-amber-300' :
+                inv.payStatus === 'Partial' ? 'bg-blue-100 text-blue-900 border border-blue-300' :
+                'bg-green-100 text-green-700'
+              }">
+                ${inv.payStatus === 'Partial' ? `PART (Baaki ₹${inv.balanceAmt})` : inv.payStatus}
+              </span>
+            </td>
             <td class="p-3 text-center space-x-2 font-sans">
-              <button onclick="reprintSavedBill(${inv.id})" class="bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs px-2.5 py-1 rounded font-medium border">Reprint</button>
-              <button onclick="deleteSavedBill(${inv.id})" class="bg-red-600 hover:bg-red-700 text-white text-xs px-2.5 py-1 rounded font-bold shadow-sm">Delete</button>
+              <button onclick="reprintSavedBill(${inv.id})" class="bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs px-2 py-1 rounded font-medium border">Reprint</button>
+              <button onclick="deleteSavedBill(${inv.id})" class="bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded font-bold shadow-sm">Delete</button>
             </td>
           </tr>
         `).join('');
       };
     }
 
-    // Direct Permanent Delete
     function deleteSavedBill(id) {
       if (confirm('Kya aap sach me ye bill permanently delete karna chahte hain?')) {
         const tx = db.transaction("invoices", "readwrite");
         tx.objectStore("invoices").delete(id);
-        tx.oncomplete = function() {
-          loadBillHistory();
-        };
+        tx.oncomplete = () => loadBillHistory();
       }
     }
 
@@ -990,40 +1089,7 @@
       const tx = db.transaction("invoices", "readonly");
       tx.objectStore("invoices").get(id).onsuccess = function(e) {
         const inv = e.target.result;
-        document.getElementById('printDocType').innerText = "DUPLICATE INVOICE";
-        document.getElementById('pRefNo').innerText = inv.invNo;
-        document.getElementById('pName').innerText = inv.custName;
-        document.getElementById('pPhone').innerText = inv.phone || 'N/A';
-        document.getElementById('pDate').innerText = inv.date;
-
-        document.getElementById('pTableHead').innerHTML = `
-          <tr>
-            <th class="py-2">Item Description</th>
-            <th class="py-2">Size / Detail</th>
-            <th class="py-2 text-right">Sq.Ft / Qty</th>
-            <th class="py-2 text-right">Rate</th>
-            <th class="py-2 text-right">Amount</th>
-          </tr>
-        `;
-
-        document.getElementById('pTableBody').innerHTML = inv.items.map(i => `
-          <tr>
-            <td class="py-2 font-sans font-medium">${i.name}</td>
-            <td class="py-2 text-slate-600 font-sans">${i.detail}</td>
-            <td class="py-2 text-right font-mono">${i.sqft ? i.sqft.toFixed(2) : '-'}</td>
-            <td class="py-2 text-right font-mono">₹${i.rate}</td>
-            <td class="py-2 text-right font-bold font-mono">₹${i.amount.toFixed(2)}</td>
-          </tr>
-        `).join('');
-
-        document.getElementById('pTotalsBlock').innerHTML = `
-          <p>Subtotal: ${inv.subtotal}</p>
-          <p>GST: ${inv.gst}</p>
-          <p>Discount: ₹${inv.discount}</p>
-          <p class="text-sm font-black border-t pt-1">Grand Total: ${inv.grandTotal}</p>
-          <p class="text-[10px] text-slate-500 uppercase">Status: ${inv.payStatus}</p>
-        `;
-
+        populatePrintTemplate(inv);
         document.getElementById('printArea').classList.remove('hidden');
         window.print();
         document.getElementById('printArea').classList.add('hidden');
